@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9b083c4aae7e1f3e3f96ea6209506a15a239aeb1060cdb52447dc3c886e6f2f5
+-- hash: 0a45e09d2b0f87227978c611f625b5c9c08d54ee2a3d19b3467ce74d1535e609
 
 name:           blogPosts
 version:        0.1.0.0
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Lib
+      Posts
   other-modules:
       Paths_blogPosts
   hs-source-dirs:
