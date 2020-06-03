@@ -8,13 +8,10 @@ import System.Environment
 import Text.HTML.Scalpel
 import Data.Char (isSpace)
 import Data.Maybe (fromMaybe)
-import Control.Monad.Zip (mzipWith)
 import Control.Monad.Zip (MonadZip, mzipWith)
 
 postTextScraper :: Scraper String [String]
-postTextScraper = do
-    itemData <- texts $ "div" @: [hasClass "item-page"] // "p"
-    return $ itemData
+postTextScraper = texts $ "div" @: [hasClass "item-page"] // "p"
 
 trim :: String -> String
 trim = f . f
@@ -32,9 +29,9 @@ posts = chroots postList post
 -- get simple post data
 post :: Scraper String (String, String)
 post = do
-    postTitle <- text $ aTag
-    postUrl <- attr "href" $ aTag
-    return $ (trim postTitle, postUrl)
+    postTitle <- text aTag
+    postUrl <- attr "href" aTag
+    return (trim postTitle, postUrl)
     where
         aTag = "h2" @: ["itemProp" @= "name"] // "a"
     
@@ -51,7 +48,7 @@ concatUri :: URL -> (String, String) -> (String, String)
 concatUri url (t, u) = (t, url <> u)
 
 completeUrl :: URL -> [(String, String)] -> [(String, String)]
-completeUrl url postData = map (concatUri url) postData
+completeUrl url = map (concatUri url)
 
 getPostText :: (String, URL) -> IO String
 getPostText (t, url) = do
@@ -65,7 +62,7 @@ addPostText ((t, u), text) = do
     return (t, u, textString)
 
 mzipMaybe :: MonadZip m => m [a] -> m [b] -> m [(a, b)]
-mzipMaybe infos texts = mzipWith (\a b -> zip a b) infos texts
+mzipMaybe = mzipWith zip 
 
 listUrlsForSite :: URL -> IO ()
 listUrlsForSite url = do
