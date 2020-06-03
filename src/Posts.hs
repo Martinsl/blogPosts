@@ -10,6 +10,11 @@ import Data.Char (isSpace)
 import Data.Maybe (fromMaybe)
 import Control.Monad.Zip (MonadZip, mzipWith)
 
+data Post = Post { title   :: String
+                 , url     :: String
+                 , content :: Maybe String
+                 } deriving (Show)
+
 postTextScraper :: Scraper String [String]
 postTextScraper = texts $ "div" @: [hasClass "item-page"] // "p"
 
@@ -18,7 +23,7 @@ trim = f . f
     where f = reverse . dropWhile isSpace
 
 -- List of all posts, with (Title, Uri)
-posts :: Scraper String [(String, String)]
+posts :: Scraper String [Post]
 posts = chroots postList post
     where
         blogDiv = "div" @: [hasClass "blog"]
@@ -27,42 +32,45 @@ posts = chroots postList post
         postList = blogDiv // itemsLeadingDiv // blogPosts
 
 -- get simple post data
-post :: Scraper String (String, String)
+post :: Scraper String Post
 post = do
     postTitle <- text aTag
     postUrl <- attr "href" aTag
-    return (trim postTitle, postUrl)
+    return Post { title=trim postTitle, url=postUrl, content=Nothing}
     where
         aTag = "h2" @: ["itemProp" @= "name"] // "a"
     
-formatPrintPost :: (String, String) -> String
-formatPrintPost (t, u) = t <> " - " <> u
+formatPrintPost :: Post -> String
+formatPrintPost p = title p <> " - " <> url p
 
-formatPrintPostFull :: (String, String, String) -> String
-formatPrintPostFull (t, u, d) = t <> " - " <> u <> ":\n\n\n" <> d
+formatPrintPostFull :: Post -> String
+formatPrintPostFull p = 
+    case content p of
+        Nothing   -> title p <> " - " <> url p <> ":\n\n"
+        Just cont -> title p <> " - " <> url p <> ":\n\n" <> cont <> "\n\n\n"
 
-printTriples :: Foldable t => t (String, String, String) -> IO()
+printTriples :: Foldable t => t Post -> IO()
 printTriples = mapM_ $ putStrLn . formatPrintPostFull
 
-concatUri :: URL -> (String, String) -> (String, String)
-concatUri url (t, u) = (t, url <> u)
+concatUri :: URL -> Post -> Post
+concatUri u p = p { url = u <> url p }
 
-completeUrl :: URL -> [(String, String)] -> [(String, String)]
+completeUrl :: URL -> [Post] -> [Post]
 completeUrl url = map (concatUri url)
 
-getPostText :: (String, URL) -> IO String
-getPostText (t, url) = do
-    postText <- scrapeURL url postTextScraper
-    return $ fromMaybe t $ concatText postText
+getPostText :: Post -> IO String
+getPostText p = do
+    postText <- scrapeURL (url p) postTextScraper
+    return $ fromMaybe (title p) $ concatText postText
     where
         concatText = fmap unlines 
 
-addPostText ((t, u), text) = do
+addPostText (p, text) = do
     textString <- text
-    return (t, u, textString)
+    return p { content = Just $ trim textString }
 
 mzipMaybe :: MonadZip m => m [a] -> m [b] -> m [(a, b)]
-mzipMaybe = mzipWith zip 
+mzipMaybe = mzipWith zip
 
 listUrlsForSite :: URL -> IO ()
 listUrlsForSite url = do
@@ -73,7 +81,7 @@ listUrlsForSite url = do
     -- getting post full text
     let postTexts = fmap (map getPostText) postHeaderFull
     -- creating triple (title, url, data)
-    let maybeData = fmap (map addPostText) $ mzipMaybe postHeaderFull postTexts
+    let maybeData = map addPostText <$> mzipMaybe postHeaderFull postTexts
     allData <- sequence $ fromMaybe [] maybeData
     putStrLn $ printTriples allData
     where
